@@ -1,0 +1,69 @@
+﻿@model IEnumerable<Login_Form.Models.Bill>
+
+@{
+    ViewData["Title"] = "Index";
+}
+@if (TempData["RefundLog1"] != null)
+{
+	<div class="alert alert-success">
+		@TempData["RefundLog1"]
+	</div>
+}
+@if (TempData["RefundLog2"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["RefundLog2"]
+    </div>
+}
+
+<h1>Bills</h1>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Id)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Description)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.CreateDate)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Status)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Account)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.Id)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Description)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.CreateDate)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Status)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Account.Username)
+            </td>
+            <td>
+@*                 <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> | *@
+                <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+                    <a asp-action="Refund" asp-route-id="@item.Id">Refund</a>|
+                    <a asp-action="Restock" asp-route-id="@item.Id">Restock to Cart</a>
+            </td>
+        </tr>
+}
+    </tbody>
+</table>

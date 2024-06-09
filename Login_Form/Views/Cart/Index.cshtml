@@ -1,0 +1,87 @@
+﻿@using Newtonsoft.Json
+@model IEnumerable<Login_Form.Models.CartDetail>
+
+@{
+    ViewData["Title"] = "Index";
+    var Amount = ViewBag.totalAmount;
+}
+
+<h1>Cart Home</h1>
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+@if (TempData["ErrorBill"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["ErrorBill"]
+    </div>
+}
+@if (TempData["CreateAgain"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["CreateAgain"]
+    </div>
+}
+
+<p>
+    @Amount VND
+</p>
+
+<p>
+    <a asp-action="Create">Add more product!</a>
+</p>
+<p>
+    <a asp-action="CreateBill">Check!</a>
+</p>
+<table class="table">
+    <thead>
+		<tr>
+			<th>
+				@Html.DisplayNameFor(model => model.Id)
+			</th>
+			<th>
+				@Html.DisplayNameFor(model => model.ProductId)
+			</th>
+            <th>
+                @Html.DisplayNameFor(model => model.Username)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Quantity)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Satus)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+			<td>
+				@Html.DisplayFor(modelItem => item.Id)
+			</td>
+			<td>
+				@Html.DisplayFor(modelItem => item.ProductId)
+			</td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Username)
+            </td>
+			<td>
+                @Html.DisplayFor(modelItem => item.Quantity)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Satus)
+            </td>
+            
+            <td>
+                <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+                <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+                <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+            </td>
+        </tr>
+}
+    </tbody>
+</table>

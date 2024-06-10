@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Newtonsoft.Json;
 using System.Globalization;
 
 namespace Login_Form.Controllers
@@ -11,9 +12,11 @@ namespace Login_Form.Controllers
     public class BillController : Controller
     {
         Models.AppContext _context;
+        HttpClient _httpClient;
         public BillController()
         {
             _context = new Models.AppContext();
+            _httpClient = new HttpClient();
         }
         // GET: BillController
         public ActionResult Index()
@@ -25,7 +28,9 @@ namespace Login_Form.Controllers
             }
             else
             {
-                var allBill = _context.Bills.Where(bd => bd.Username == check).ToList();
+                var url = $@"https://localhost:7137/api/Bills/get-all-bill?check={check}";
+                var response = _httpClient.GetStringAsync(url).Result;
+                var allBill = JsonConvert.DeserializeObject<List<Bill>>(response);
                 return View(allBill);
             }
         }
@@ -33,7 +38,10 @@ namespace Login_Form.Controllers
         // GET: BillController/Details/5
         public ActionResult Details(string id)
         {
-            var billDetails = _context.BillDetails.Where(b => b.BillId == id).ToList();
+            var url = $@"https://localhost:7137/api/Bills/get-all-billdetails?id={id}";
+            var response = _httpClient.GetStringAsync(url).Result;
+            var data = JsonConvert.DeserializeObject<List<BillDetail>>(response);
+            var billDetails = data.Where(b => b.BillId == id).ToList();
             ViewBag.totalAmount = billDetails.Sum(p => p.Price).ToString("#,###", 
                 CultureInfo.GetCultureInfo("vi-VN").NumberFormat);
             ViewBag.billId = id;
@@ -67,38 +75,12 @@ namespace Login_Form.Controllers
                 }
                 else
                 {
-                    Bill newdata = new Bill()
+                    var url = $@"https://localhost:7137/api/Bills/create-bill?check={check}";
+                    var response = _httpClient.PostAsJsonAsync(url, bill).Result;
+                    if (!response.IsSuccessStatusCode)
                     {
-                        Id = bill.Id,
-                        Description = bill.Description,
-                        CreateDate = bill.CreateDate,
-                        Username = check,
-                        Status = bill.Status
-                    };
-                    _context.Bills.Add(newdata);
-                    _context.SaveChanges();
-                    var cartItems = _context.CartDetails.Where(p => p.Username == check).ToList();
-                    foreach (var cartItem in cartItems)
-                    {
-                        var product = _context.Products.Find(cartItem.ProductId);
-                        if(cartItem.Quantity > product.Quantity)
-                        {
-                            TempData["Error"] = $"Sản phẩm {cartItem.ProductId} không đủ số lượng!";
-                            return RedirectToAction("Index", "Cart");
-                        }
-                        BillDetail billDetail = new BillDetail()
-                        {
-                            Id = cartItem.Id,
-                            ProductId = cartItem.ProductId,
-                            BillId = bill.Id,
-                            Quantity = cartItem.Quantity,
-                            Price = cartItem.Quantity * product.Price
-                        };
-                        _context.BillDetails.Add(billDetail);
-                        _context.CartDetails.Remove(cartItem);
-                        product.Quantity = product.Quantity - billDetail.Quantity;
-                        _context.Products.Update(product);
-                        _context.SaveChanges();
+                        TempData["ErrorBill"] = response.ToString();
+                        return RedirectToAction("Cart", "Index");
                     }
                 }
                 return RedirectToAction("Index");
@@ -129,10 +111,8 @@ namespace Login_Form.Controllers
         {
             try
             {
-                var editData = _context.Bills.Find(id);
-                editData.Status = 2; //Chuyển thành trạng thái đã xoá
-                _context.Bills.Update(editData);
-                _context.SaveChanges();
+                var url = $@"https://localhost:7137/api/Bills/delete-bill?id={id}";
+                var response = _httpClient.DeleteAsync(url).Result;
                 return RedirectToAction("Index");
             }
             catch
@@ -143,26 +123,9 @@ namespace Login_Form.Controllers
 
         public IActionResult Refund(string id)
         {
-            var bills = _context.BillDetails.Where(bd =>bd.BillId == id).ToList();
-            if (_context.Bills.Find(id).Status != 100)
-            {
-                foreach (var item in bills)
-                {
-                    var product = _context.Products.First(p => p.Id == item.ProductId);
-                    product.Quantity = product.Quantity + item.Quantity;
-                    _context.Products.Update(product);
-                    _context.SaveChanges();
-                }
-                var bill = _context.Bills.Find(id);
-                bill.Status = 100;
-                _context.Bills.Update(bill);
-                _context.SaveChanges();
-                TempData["RefundLog1"] = "Hoàn tiền thành công!";
-            }
-            else
-            {
-                TempData["RefundLog2"] = "Đơn hàng nãy đã được hoàn trả, bạn tính làm gì vậy?";
-            }
+            var url = $@"https://localhost:7137/api/Bills/refund?id={id}";
+            var response = _httpClient.GetStringAsync(url).Result;
+            TempData["RefundLog1"] = response;
             return RedirectToAction("Index");
         }
 
@@ -175,78 +138,11 @@ namespace Login_Form.Controllers
             }
             else
             {
-                var billDetails = _context.BillDetails.Where(bd => bd.BillId == id).ToList();
-                var productsLog1 = new List<string>();
-                var productsLog2 = new List<string>();
-                var AddSuccess1 = new List<string>();
-                var AddSuccess2 = new List<string>();
-                foreach (var item in billDetails)
+                var url = $@"https://localhost:7137/api/Bills/restock?id={id}&check={check}";
+                var response = _httpClient.GetStringAsync(url).Result;
+                if (!string.IsNullOrEmpty(response))
                 {
-                    var cartDetail = _context.CartDetails.FirstOrDefault(p => p.ProductId == item.ProductId && p.Username == check);
-                    if(cartDetail == null)
-                    {
-                        var product = _context.Products.First(p => p.Id == item.ProductId);
-                        if (product.Quantity < item.Quantity)
-                        {
-                            productsLog1.Add(product.Id.ToString());
-                        }
-                        else
-                        {
-                            CartDetail cart = new CartDetail()
-                            {
-                                Id = Guid.NewGuid(),
-                                ProductId = item.ProductId,
-                                Username = check,
-                                Quantity = item.Quantity,
-                                Satus = 1
-                            };
-                            _context.CartDetails.Add(cart);
-                            AddSuccess1.Add(cart.Id.ToString());
-                        }
-                        _context.SaveChanges();
-                    }
-                    else
-                    {
-                        var product = _context.Products.First(p => p.Id == item.ProductId);
-                        if(product.Quantity < item.Quantity + cartDetail.Quantity)
-                        {
-                            productsLog2.Add(product.Id.ToString());
-                        }
-                        else
-                        {
-                            cartDetail.Quantity = item.Quantity + cartDetail.Quantity;
-                            _context.CartDetails.Update(cartDetail);
-                            AddSuccess2.Add(cartDetail.Id.ToString());
-                        }
-                        _context.SaveChanges();
-                    }
-                }
-                if(productsLog1.Count > 0 || productsLog2.Count > 0)
-                {
-                    if(productsLog1.Count > 0)
-                    {
-                    TempData["BuyAgainLog1"] = $"Sản phẩm sau không đủ số lượng trong kho để thêm lại sản phẩm vào giỏ hàng: \n" +
-                            $"{string.Join(", ", productsLog1.ToArray())}";
-                    }
-
-                    if(productsLog2.Count > 0)
-                    {
-                        TempData["BuyAgainLog2"] = $"Sản phẩm sau không đủ số lượng trong kho để cộng dồn sản phẩm vào giỏ hàng: \n" +
-                                                    $"{string.Join(", ", productsLog2.ToArray())}";
-                    }
-
-                    if(AddSuccess1.Count > 0)
-                    {
-                        TempData["BillDetailsRestockLogSuccess1"] =
-                            $"Sản phẩm sau đã được thêm vào : {string.Join(", ", AddSuccess1.ToArray())}";
-                    }
-
-                    if(AddSuccess2.Count > 0)
-                    {
-                        TempData["BillDetailsRestockLogSuccess2"] =
-                            $"Sản phẩm sau đã được cộng thêm số lượng : {string.Join(", ", AddSuccess2.ToArray())}";
-                    }
-
+                    TempData["BuyAgainLog1"] = response;
                     return RedirectToAction("Details", new { id });
                 }
 				else
@@ -254,7 +150,6 @@ namespace Login_Form.Controllers
                     TempData["CreateAgain"] = "Restock thành công!";
                     return RedirectToAction("Index", "Cart");
                 }
-                
             }
         }
     }

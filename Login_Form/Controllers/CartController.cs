@@ -9,9 +9,11 @@ namespace Login_Form.Controllers
     public class CartController : Controller
     {
         Models.AppContext _context;
+        HttpClient _httpClient;
         public CartController()
         {
             _context = new Models.AppContext();
+            _httpClient = new HttpClient();
         }
         public IActionResult Index()
         {
@@ -22,18 +24,20 @@ namespace Login_Form.Controllers
             }
             else
             {
-                var cartItems = _context.CartDetails.Where(p =>p.Username == check);
+                var url = $@"https://localhost:7137/api/Carts/get-all-cartDetails?check={check}";
+                var response = _httpClient.GetStringAsync(url).Result;
+                var cartItems = JsonConvert.DeserializeObject<List<CartDetail>>(response);
                 decimal total = 0;
                 cartItems.ToList().ForEach(p =>
                 {
                     var product = _context.Products.Find(p.ProductId);
-                    if(product != null)
+                    if (product != null)
                     {
-                         total = p.Quantity * product.Price;
+                        total = p.Quantity * product.Price;
                     }
                 });
                 ViewBag.totalAmount = total.ToString("#,###",
-                CultureInfo.GetCultureInfo("vi-VN").NumberFormat); ;
+                CultureInfo.GetCultureInfo("vi-VN").NumberFormat);
                 return View(cartItems);
             }
         }
@@ -44,14 +48,18 @@ namespace Login_Form.Controllers
         }
         public IActionResult Details(Guid id)
         {
-            var product = _context.CartDetails.Find(id);
+            var url = $@"https://localhost:7137/api/Carts/get-by-id-cartDetails?id={id}";
+            var response = _httpClient.GetStringAsync(url).Result;
+            var product = JsonConvert.DeserializeObject<CartDetail>(response);
             return View(product);
         }
 
         public IActionResult Edit(Guid id)
         {
-            var editData = _context.CartDetails.Find(id);
-            return View(editData);
+            var url = $@"https://localhost:7137/api/Carts/get-by-id-cartDetails?id={id}";
+            var response = _httpClient.GetStringAsync(url).Result;
+            var product = JsonConvert.DeserializeObject<CartDetail>(response);
+            return View(product);
         }
 
         [HttpPost]
@@ -59,15 +67,13 @@ namespace Login_Form.Controllers
         {
             try
             {
-                var editData = _context.CartDetails.Find(cartDetail.Id);
-                if (cartDetail.Quantity > _context.Products.Find(cartDetail.ProductId).Quantity)
+                var url = $@"https://localhost:7137/api/Carts/update-cartDetail";
+                var response = _httpClient.PutAsJsonAsync(url, cartDetail).Result;
+                if (!response.IsSuccessStatusCode)
                 {
-                    TempData["CartEditError"] = $"Số lượng chỉ còn {_context.Products.Find(cartDetail.ProductId).Quantity}";
+                    TempData["CartEditError"] = response.ToString();
                     return RedirectToAction("Edit");
                 }
-                else { editData.Quantity = cartDetail.Quantity; }
-                _context.CartDetails.Update(editData);
-                _context.SaveChanges();
                 return RedirectToAction("Index");
             }
             catch
@@ -78,39 +84,27 @@ namespace Login_Form.Controllers
 
         public ActionResult Delete(Guid id)
         {
-            var DeleteData = _context.CartDetails.Find(id);
-            _context.CartDetails.Remove(DeleteData);
-            _context.SaveChanges();
+            var url = $@"https://localhost:7137/api/Carts/delete-cartDetail?id={id}";
+            var response = _httpClient.DeleteAsync(url).Result;
             return RedirectToAction("Index");
         }
 
         public IActionResult CreateBill()
         {
             var check = HttpContext.Session.GetString("Account");
-            var cartItems = _context.CartDetails.Where(p => p.Username == check).ToList();
-            if (cartItems.Count == 0)
+            var url = $@"https://localhost:7137/api/Carts/create-bill?check={check}";
+            var response = _httpClient.GetStringAsync(url).Result;
+            if (response.ToString() == "Vui lòng mua sản phẩm trước khi thanh toán!")
             {
-                TempData["ProductLog"] = "Vui lòng mua sản phẩm trước khi thanh toán!";
+                TempData["ProductLog"] = response;
                 return RedirectToAction("Index", "Product");
             }
-            else
+            if (!string.IsNullOrEmpty(response))
             {
-                foreach (var item in cartItems) 
-                {
-                    if(_context.Products.Where(p=>p.Id == item.ProductId).First().Quantity == 0)
-                    {
-                        TempData["ErrorBill"] = $"Sản phẩm {item.ProductId} đã hết hàng!";
-                        return RedirectToAction("Index");
-                    }
-                    else if(_context.Products.Where(p=>p.Id == item.ProductId).First().Quantity < item.Quantity)
-                    {
-                        TempData["ErrorBill"] = $"Sản phẩm {item.ProductId} trong kho không đáp ứng được số lượng trong giỏ hàng!";
-                        return RedirectToAction("Index");
-                    }
-                }
-                return RedirectToAction("Create", "Bill");
+                TempData["ErrorBill"] = response;
+                return RedirectToAction("Index");
             }
-            
+            return RedirectToAction("Create", "Bill");
         }
     }
 }

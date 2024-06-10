@@ -1,7 +1,6 @@
-﻿
-namespace Login_Form.Models
+﻿namespace AppAPI.Models
 {
-    public class Product
+    public class Products
     {
         public Guid Id { get; set; }
         public string Name { get; set; }
@@ -9,8 +8,5 @@ namespace Login_Form.Models
         public decimal Price { get; set; }
         public int Quantity { get; set; }
         public int Status { get; set; }
-        //Quan hệ
-        public virtual List<BillDetail> BillDetails { get; set; }
-        public virtual List<CartDetail> CartDetails { get; set; }
     }
 }

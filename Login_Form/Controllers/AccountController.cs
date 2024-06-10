@@ -6,13 +6,15 @@ namespace Login_Form.Controllers
     public class AccountController : Controller
     {
         Models.AppContext appContext;
+        HttpClient _client;
         public AccountController()
         {
             appContext = new Models.AppContext();
+            _client = new HttpClient();
         }
         public IActionResult Login(string username, string password)
         {
-            if(username == null && password == null)
+            if (username == null && password == null)
             {
                 return View();
             }
@@ -20,7 +22,7 @@ namespace Login_Form.Controllers
             {
                 //Kiểm tra dữ liệu đăng nhập và trả về kết quả
                 var data = appContext.Accounts.FirstOrDefault(p => p.Username == username && p.Password == password);
-                if(data == null)
+                if (data == null)
                 {
                     return Content("Đăng nhập thất bại");
                 }
@@ -40,23 +42,10 @@ namespace Login_Form.Controllers
         [HttpPost]
         public IActionResult SignUp(Account account)
         {
-            try
-            {
-                appContext.Accounts.Add(account);
-                Cart cart = new Cart() //Tạo 1 cart mới cho mỗi user được tạo
-                {
-                    Username = account.Username,
-                    Status = 1
-                };
-                appContext.Carts.Add(cart);
-                appContext.SaveChanges();
-                TempData["Status"] = "Đăng kí thành công!"; //Tạo thông báo
-                return RedirectToAction("Login"); // Chuyển hướng về login
-            }
-            catch
-            {
-                return BadRequest();
-            }
+            var url = @"https://localhost:7137/api/Accounts/signup";
+            var response = _client.PostAsJsonAsync(url, account).Result;
+            if (response.IsSuccessStatusCode) return RedirectToAction("Login");
+            return BadRequest();
         }
     }
 }

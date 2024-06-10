@@ -1,28 +1,35 @@
 ﻿using Login_Form.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 
 namespace Login_Form.Controllers
 {
     public class ProductController : Controller
     {
         Models.AppContext _context;
+        HttpClient _client;
         public ProductController()
         {
             _context = new Models.AppContext();
+            _client = new HttpClient();
         }
         // GET: ProductController
         public ActionResult Index() // Lấy ra danh sách sản phẩm
         {
-            var allProducts = _context.Products.ToList();
-            return View(allProducts);
+            var url = @"https://localhost:7137/api/Products/get-all-product";
+            var result = JsonConvert.DeserializeObject<List<Product>>(
+                _client.GetStringAsync(url).Result);
+            return View(result);
         }
 
         // GET: ProductController/Details/5
         public ActionResult Details(Guid id)
         {
-            var product = _context.Products.Find(id); //Chỉ áp dụng cho PK
-            return View(product);
+            var url = $@"https://localhost:7137/api/Products/get-by-id-product?id={id}";
+            var result = JsonConvert.DeserializeObject<Product>(
+                _client.GetStringAsync(url).Result);
+            return View(result);
         }
 
         // GET: ProductController/Create
@@ -53,7 +60,8 @@ namespace Login_Form.Controllers
             {
                 try
                 {
-                    _context.Products.Add(product); _context.SaveChanges();
+                    string url = @"https://localhost:7137/api/Products/create-product";
+                    var response = _client.PostAsJsonAsync(url, product).Result;
                     return RedirectToAction("Index");
                 }
                 catch
@@ -68,8 +76,10 @@ namespace Login_Form.Controllers
         public ActionResult Edit(Guid id)
         {
             //Lấy được thông tin cần sửa lên form sửa
-            var editData = _context.Products.Find(id);
-            return View(editData);
+            var url = $@"https://localhost:7137/api/Products/get-by-id-product?id={id}";
+            var result = JsonConvert.DeserializeObject<Product>(
+                _client.GetStringAsync(url).Result);
+            return View(result);
         }
         [HttpPost]
         public ActionResult Edit(Product product)
@@ -83,14 +93,9 @@ namespace Login_Form.Controllers
             {
                 try
                 {
-                    var editData = _context.Products.Find(product.Id); //tìm ra đối tượng cần sửa
-                    editData.Name = product.Name;
-                    editData.Description = product.Description;
-                    editData.Price = product.Price;
-                    editData.Quantity = product.Quantity;
-                    editData.Status = product.Status;
-                    _context.Products.Update(editData);
-                    _context.SaveChanges();
+
+                    var url = @"https://localhost:7137/api/Products/update-product";
+                    var response = _client.PutAsJsonAsync(url, product).Result;
                     return RedirectToAction("Index");
                 }
                 catch
@@ -111,9 +116,8 @@ namespace Login_Form.Controllers
 			}
             else
             {
-                var DeleteData = _context.Products.Find(id);
-                _context.Products.Remove(DeleteData);
-                _context.SaveChanges();
+                var url = $@"https://localhost:7137/api/Products/delete-product?id={id}";
+                var response = _client.DeleteAsync(url).Result;
                 return RedirectToAction("Index");
             }
 				
@@ -130,47 +134,11 @@ namespace Login_Form.Controllers
             }
             else
             {
-                //Xem trong giỏ hàng ứng với user đó đã có sản phẩm với id này hay chưa
-                var cartItem = _context.CartDetails.FirstOrDefault(p=>p.ProductId == id && p.Username == check);
-                if(cartItem == null)//Sản phẩm chưa hề tồn tại trong giỏ hàng
-                {
-                    if(quantity >= _context.Products.Find(id).Quantity)
-                    {
-                        quantity = _context.Products.Find(id).Quantity;
-                    }
-                    CartDetail cartDetail = new CartDetail() // Tạo mới 1 CartDetails
-                    {
-                        Id = Guid.NewGuid(),
-                        Username = check,
-                        ProductId = id,
-                        Quantity = quantity,
-                        Satus = 1
-                    };
-                    _context.CartDetails.Add(cartDetail);
-                    _context.SaveChanges();
-                }
-                else
-                {
-                    if (quantity >= _context.Products.Find(id).Quantity)
-                    {
-                        cartItem.Quantity = _context.Products.Find(id).Quantity;
-                    }else if (_context.Products.Find(id).Quantity == 0)
-                    {
-                        TempData["ProductLog"] = "Sản phẩm đã hết hàng";
-                        return RedirectToAction("Index", "Product");
-                    }else if (cartItem.Quantity + quantity > _context.Products.Find(id).Quantity)
-                    {
-                        TempData["ProductLog"] = "Giỏ hàng của bạn đã chứa tối đa sản phẩm trong kho!";
-                        return RedirectToAction("Index", "Product");
-                    }
-                    else
-                    {
-                        cartItem.Quantity = cartItem.Quantity + quantity; //Cộng dồn số lượng, đã check quá tổng
-                    }
-                    _context.CartDetails.Update(cartItem);
-                    _context.SaveChanges();
-                }
-                return RedirectToAction("Index","Product");//   Quay lại trang danh sách sản phẩm
+                var url = $@"https://localhost:7137/api/Products/add-to-cart?check={check}&id={id}&quantity={quantity}";
+                var response = _client.GetStringAsync(url).Result;
+                if (string.IsNullOrEmpty(response)) return RedirectToAction("Index","Product");
+                TempData["ProductLog"] = response;
+                return RedirectToAction("Index", "Product");
             }
         }
     }
